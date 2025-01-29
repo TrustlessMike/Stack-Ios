@@ -14,10 +14,9 @@ enum Constants {
     
     // Enoki service endpoints
     static let proverBaseURL = "https://api.enoki.mystenlabs.com"
-    static let proverEndpoint = "\(proverBaseURL)/v1"  // Base endpoint with version
-    static let zkLoginAPIEndpoint = "\(proverEndpoint)/zklogin/zkp"  // ZKP endpoint
-    static let nonceEndpoint = "\(proverEndpoint)/zklogin/nonce"  // Nonce endpoint
-    static let saltService = "\(proverEndpoint)/zklogin"  // Salt service
+    static let zkLoginAPIEndpoint = "\(proverBaseURL)/api/proof"  // ZK proof endpoint
+    static let nonceEndpoint = "\(proverBaseURL)/api/validate"  // Nonce validation endpoint
+    static let saltService = "\(proverBaseURL)/api/salt"  // Salt endpoint
     static let networkTimeout: TimeInterval = 30
     
     // Ephemeral key configuration
@@ -28,9 +27,9 @@ enum Constants {
     static let maxEpochDuration = 2  // Number of epochs the proof is valid for
     static let proofTimeout: TimeInterval = 30  // Timeout for proof generation
     
-    // ZK Login specific endpoints
-    static let proverPath = "/v1/zklogin/prove"  // Updated proof endpoint path
-    static let saltPath = "/v1/get_salt"  // Salt retrieval endpoint
+    // Remove deprecated paths
+    // static let proverPath = "/v1/zklogin/prove"  // Updated proof endpoint path
+    // static let saltPath = "/v1/get_salt"  // Salt retrieval endpoint
 }
 
 struct GoogleOAuthConfig {
@@ -68,9 +67,16 @@ struct EphemeralKey {
     let validUntilEpoch: Int
     
     init(validUntilEpoch: Int) {
-        let privateKey = Curve25519.Signing.PrivateKey()
-        self.privateKey = privateKey
+        // Create a new Ed25519 key pair
+        self.privateKey = Curve25519.Signing.PrivateKey()
         self.publicKey = privateKey.publicKey
         self.validUntilEpoch = validUntilEpoch
+    }
+    
+    // Get the Ed25519 public key as base64 string
+    var publicKeyBase64: String {
+        // Convert to raw bytes and encode as base64
+        let rawBytes = publicKey.rawRepresentation
+        return rawBytes.base64EncodedString()
     }
 } 

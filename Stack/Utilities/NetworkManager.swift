@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import os
+import CryptoKit
 
 class NetworkManager {
     static let shared = NetworkManager()
@@ -60,6 +61,12 @@ class NetworkManager {
                 throw NetworkError.keyGenerationFailed
             }
             
+            // Validate public key format
+            let publicKeyBase64 = ephemeralKey.publicKeyBase64
+            let publicKeyData = ephemeralKey.publicKey.rawRepresentation
+            logger.info("Public key length: \(publicKeyData.count) bytes")
+            logger.info("Public key base64: \(publicKeyBase64)")
+            
             // Step 3: Get proof from Enoki service
             guard let proofURL = URL(string: Constants.zkLoginAPIEndpoint) else {
                 logger.error("Invalid proof URL: \(Constants.zkLoginAPIEndpoint)")
@@ -69,30 +76,26 @@ class NetworkManager {
             var proofRequest = URLRequest(url: proofURL)
             proofRequest.httpMethod = "POST"
             proofRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            proofRequest.setValue("application/json", forHTTPHeaderField: "Accept")
-            proofRequest.setValue("Bearer \(Constants.enokiPublicKey)", forHTTPHeaderField: "Authorization")
-            proofRequest.setValue(token, forHTTPHeaderField: "zklogin-jwt")
+            proofRequest.setValue(Constants.enokiPublicKey, forHTTPHeaderField: "X-API-Key")
             proofRequest.timeoutInterval = Constants.proofTimeout
             
-            // Convert raw public key to base64 first
-            let publicKeyData = ephemeralKey.publicKey.rawRepresentation
-            let publicKeyBase64 = publicKeyData.base64EncodedString()
-            
-            let randomBytes = (0..<32).map { _ in UInt8.random(in: 0...255) }
-            let jwtRandomness = "0x" + randomBytes.map { String(format: "%02x", $0) }.joined()
+            // Generate randomness (without 0x prefix)
+            var randomBytes = [UInt8](repeating: 0, count: 32)
+            _ = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
+            let jwtRandomness = randomBytes.map { String(format: "%02x", $0) }.joined()
             
             let proofRequestBody: [String: Any] = [
-                "network": "testnet",
+                "chainId": "sui-testnet",
                 "maxEpoch": maxEpoch,
-                "ephemeralPublicKey": publicKeyBase64, // Using base64 encoded key
-                "randomness": jwtRandomness
+                "ephemeralPublicKey": publicKeyBase64,
+                "jwtRandomness": jwtRandomness,
+                "jwt": token
             ]
             
             proofRequest.httpBody = try JSONSerialization.data(withJSONObject: proofRequestBody)
             
             logger.info("Sending proof request to: \(proofURL.absoluteString)")
-            logger.info("Using Authorization: Bearer \(Constants.enokiPublicKey)")
-            logger.info("Using JWT Header: \(token)")
+            logger.info("Using X-API-Key: \(Constants.enokiPublicKey)")
             if let requestBody = String(data: proofRequest.httpBody!, encoding: .utf8) {
                 logger.info("Proof request body: \(requestBody)")
             }
