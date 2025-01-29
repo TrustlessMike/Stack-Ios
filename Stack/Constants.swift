@@ -12,15 +12,25 @@ enum Constants {
     static let apiBaseURL = "https://fullnode.testnet.sui.io"
     static let rpcEndpoint = apiBaseURL  // Base URL for RPC calls
     
-    // Prover service endpoints
-    static let proverBaseURL = "https://prover.mystenlabs.com"  // Remove /v1 from base
-    static let proverEndpoint = "\(proverBaseURL)/zklogin"  // zkLogin specific endpoint
-    static let zkLoginAPIEndpoint = proverEndpoint  // Keep consistent
-    static let saltService = "https://salt.mystenlabs.com/v1/get_salt"
+    // Enoki service endpoints
+    static let proverBaseURL = "https://api.enoki.mystenlabs.com"
+    static let proverEndpoint = "\(proverBaseURL)/v1"  // Base endpoint with version
+    static let zkLoginAPIEndpoint = "\(proverEndpoint)/zklogin/zkp"  // ZKP endpoint
+    static let nonceEndpoint = "\(proverEndpoint)/zklogin/nonce"  // Nonce endpoint
+    static let saltService = "\(proverEndpoint)/zklogin"  // Salt service
     static let networkTimeout: TimeInterval = 30
     
     // Ephemeral key configuration
     static let ephemeralKeyValidityInEpochs = 2  // Key valid for 2 epochs from current
+    
+    // Enoki specific configurations
+    static let enokiPublicKey = "enoki_public_340d1143bcdc3990013f2e8f83c7930a"
+    static let maxEpochDuration = 2  // Number of epochs the proof is valid for
+    static let proofTimeout: TimeInterval = 30  // Timeout for proof generation
+    
+    // ZK Login specific endpoints
+    static let proverPath = "/v1/zklogin/prove"  // Updated proof endpoint path
+    static let saltPath = "/v1/get_salt"  // Salt retrieval endpoint
 }
 
 struct GoogleOAuthConfig {
