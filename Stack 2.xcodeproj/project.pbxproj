@@ -6,61 +6,41 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		58E690452D49B46400A2642B /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 58E690442D49B46400A2642B /* GoogleSignIn */; };
-		58E690472D49B46400A2642B /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 58E690462D49B46400A2642B /* GoogleSignInSwift */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXFileReference section */
-		58959B6C2D49A148009D8592 /* Stack.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Stack.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5865F3642D4995C800138A28 /* Stack.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Stack.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		58B1FAB32D49A943004E3E76 /* Exceptions for "Stack" folder in "Stack" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = 58959B6B2D49A148009D8592 /* Stack */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		58959B6E2D49A148009D8592 /* Stack */ = {
+		5865F3662D4995C800138A28 /* Stack */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				58B1FAB32D49A943004E3E76 /* Exceptions for "Stack" folder in "Stack" target */,
-			);
 			path = Stack;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		58959B692D49A148009D8592 /* Frameworks */ = {
+		5865F3612D4995C800138A28 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				58E690452D49B46400A2642B /* GoogleSignIn in Frameworks */,
-				58E690472D49B46400A2642B /* GoogleSignInSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		58959B632D49A148009D8592 = {
+		5865F35B2D4995C800138A28 = {
 			isa = PBXGroup;
 			children = (
-				58959B6E2D49A148009D8592 /* Stack */,
-				58959B6D2D49A148009D8592 /* Products */,
+				5865F3662D4995C800138A28 /* Stack */,
+				5865F3652D4995C800138A28 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		58959B6D2D49A148009D8592 /* Products */ = {
+		5865F3652D4995C800138A28 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				58959B6C2D49A148009D8592 /* Stack.app */,
+				5865F3642D4995C800138A28 /* Stack.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -68,69 +48,64 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		58959B6B2D49A148009D8592 /* Stack */ = {
+		5865F3632D4995C800138A28 /* Stack */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 58959B7B2D49A149009D8592 /* Build configuration list for PBXNativeTarget "Stack" */;
+			buildConfigurationList = 5865F3732D4995C900138A28 /* Build configuration list for PBXNativeTarget "Stack" */;
 			buildPhases = (
-				58959B682D49A148009D8592 /* Sources */,
-				58959B692D49A148009D8592 /* Frameworks */,
-				58959B6A2D49A148009D8592 /* Resources */,
+				5865F3602D4995C800138A28 /* Sources */,
+				5865F3612D4995C800138A28 /* Frameworks */,
+				5865F3622D4995C800138A28 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				58959B6E2D49A148009D8592 /* Stack */,
+				5865F3662D4995C800138A28 /* Stack */,
 			);
 			name = Stack;
 			packageProductDependencies = (
-				58E690442D49B46400A2642B /* GoogleSignIn */,
-				58E690462D49B46400A2642B /* GoogleSignInSwift */,
 			);
 			productName = Stack;
-			productReference = 58959B6C2D49A148009D8592 /* Stack.app */;
+			productReference = 5865F3642D4995C800138A28 /* Stack.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		58959B642D49A148009D8592 /* Project object */ = {
+		5865F35C2D4995C800138A28 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1620;
 				LastUpgradeCheck = 1620;
 				TargetAttributes = {
-					58959B6B2D49A148009D8592 = {
+					5865F3632D4995C800138A28 = {
 						CreatedOnToolsVersion = 16.2;
 					};
 				};
 			};
-			buildConfigurationList = 58959B672D49A148009D8592 /* Build configuration list for PBXProject "Stack" */;
+			buildConfigurationList = 5865F35F2D4995C800138A28 /* Build configuration list for PBXProject "Stack" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
 			);
-			mainGroup = 58959B632D49A148009D8592;
+			mainGroup = 5865F35B2D4995C800138A28;
 			minimizedProjectReferenceProxies = 1;
-			packageReferences = (
-				58E690432D49B46400A2642B /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
-			);
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 58959B6D2D49A148009D8592 /* Products */;
+			productRefGroup = 5865F3652D4995C800138A28 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				58959B6B2D49A148009D8592 /* Stack */,
+				5865F3632D4995C800138A28 /* Stack */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		58959B6A2D49A148009D8592 /* Resources */ = {
+		5865F3622D4995C800138A28 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -140,7 +115,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		58959B682D49A148009D8592 /* Sources */ = {
+		5865F3602D4995C800138A28 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -150,7 +125,7 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		58959B792D49A149009D8592 /* Debug */ = {
+		5865F3712D4995C900138A28 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -211,7 +186,7 @@
 			};
 			name = Debug;
 		};
-		58959B7A2D49A149009D8592 /* Release */ = {
+		5865F3722D4995C900138A28 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -264,7 +239,7 @@
 			};
 			name = Release;
 		};
-		58959B7C2D49A149009D8592 /* Debug */ = {
+		5865F3742D4995C900138A28 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -274,8 +249,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Stack/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Stack/Info.plist;
+				GENERATE_INFOPLIST_FILE = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -302,7 +276,7 @@
 			};
 			name = Debug;
 		};
-		58959B7D2D49A149009D8592 /* Release */ = {
+		5865F3752D4995C900138A28 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -312,8 +286,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Stack/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Stack/Info.plist;
+				GENERATE_INFOPLIST_FILE = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -343,49 +316,25 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		58959B672D49A148009D8592 /* Build configuration list for PBXProject "Stack" */ = {
+		5865F35F2D4995C800138A28 /* Build configuration list for PBXProject "Stack" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				58959B792D49A149009D8592 /* Debug */,
-				58959B7A2D49A149009D8592 /* Release */,
+				5865F3712D4995C900138A28 /* Debug */,
+				5865F3722D4995C900138A28 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		58959B7B2D49A149009D8592 /* Build configuration list for PBXNativeTarget "Stack" */ = {
+		5865F3732D4995C900138A28 /* Build configuration list for PBXNativeTarget "Stack" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				58959B7C2D49A149009D8592 /* Debug */,
-				58959B7D2D49A149009D8592 /* Release */,
+				5865F3742D4995C900138A28 /* Debug */,
+				5865F3752D4995C900138A28 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		58E690432D49B46400A2642B /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 8.0.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		58E690442D49B46400A2642B /* GoogleSignIn */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 58E690432D49B46400A2642B /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
-			productName = GoogleSignIn;
-		};
-		58E690462D49B46400A2642B /* GoogleSignInSwift */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 58E690432D49B46400A2642B /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
-			productName = GoogleSignInSwift;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
-	rootObject = 58959B642D49A148009D8592 /* Project object */;
+	rootObject = 5865F35C2D4995C800138A28 /* Project object */;
 }
