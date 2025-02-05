@@ -44,15 +44,85 @@ class NetworkManager {
         }
     }
     
+    private func getNonce(address: String) async throws -> String {
+        guard let nonceURL = URL(string: "\(Constants.proverBaseURL)/nonce") else {
+            logger.error("Invalid nonce URL")
+            throw NetworkError.invalidURL
+        }
+        
+        var nonceRequest = URLRequest(url: nonceURL)
+        nonceRequest.httpMethod = "POST"
+        nonceRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let nonceRequestBody: [String: Any] = [
+            "address": address
+        ]
+        
+        nonceRequest.httpBody = try JSONSerialization.data(withJSONObject: nonceRequestBody)
+        
+        logger.info("Requesting nonce for address: \(address)")
+        let (nonceData, nonceResponse) = try await session.data(for: nonceRequest)
+        
+        guard let httpResponse = nonceResponse as? HTTPURLResponse else {
+            logger.error("Invalid response type from nonce endpoint")
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode != 200 {
+            logger.error("Nonce request failed with status code: \(httpResponse.statusCode)")
+            if let responseString = String(data: nonceData, encoding: .utf8) {
+                logger.error("Error response: \(responseString)")
+            }
+            throw NetworkError.serverError(statusCode: httpResponse.statusCode)
+        }
+        
+        guard let json = try JSONSerialization.jsonObject(with: nonceData) as? [String: Any],
+              let nonce = json["nonce"] as? String else {
+            logger.error("Invalid nonce response format")
+            throw NetworkError.invalidResponse
+        }
+        
+        logger.info("Successfully received nonce: \(nonce)")
+        return nonce
+    }
+    
+    private func generateNonce(publicKey: String, maxEpoch: Int, randomness: String) -> String {
+        // Combine inputs in the same order as @mysten/zklogin SDK
+        let input = "\(publicKey)\(maxEpoch)\(randomness)"
+        
+        // Hash the combined input using SHA-256 (same as SDK)
+        let inputData = input.data(using: .utf8)!
+        let hashedData = SHA256.hash(data: inputData)
+        
+        // Convert hash to hex string without 0x prefix
+        let nonce = hashedData.map { String(format: "%02x", $0) }.joined()
+        
+        logger.info("""
+        Generated nonce with components:
+        Public Key: \(publicKey)
+        Max Epoch: \(maxEpoch)
+        Randomness: \(randomness)
+        Generated Nonce: \(nonce)
+        """)
+        
+        return nonce
+    }
+    
+    private func generateRandomness() -> String {
+        var randomBytes = [UInt8](repeating: 0, count: 32)
+        _ = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
+        return randomBytes.map { String(format: "%02x", $0) }.joined()
+    }
+    
     func sendZkLoginProofRequest(token: String) async throws -> Data {
         do {
             try await waitForConnection()
             
-            // Step 1: Get current epoch
+            // Step 1: Get current epoch and calculate maxEpoch
             logger.info("Fetching current epoch...")
-            let epoch = try await getCurrentEpoch()
-            let maxEpoch = epoch + Constants.maxEpochDuration
-            logger.info("Current epoch: \(epoch), maxEpoch: \(maxEpoch)")
+            let currentEpoch = try await getCurrentEpoch()
+            let maxEpoch = currentEpoch + Constants.maxEpochDuration // e.g., +10 epochs
+            logger.info("Current epoch: \(currentEpoch), maxEpoch: \(maxEpoch)")
             
             // Step 2: Generate ephemeral key pair
             currentEphemeralKey = EphemeralKey(validUntilEpoch: maxEpoch)
@@ -61,13 +131,40 @@ class NetworkManager {
                 throw NetworkError.keyGenerationFailed
             }
             
-            // Validate public key format
-            let publicKeyBase64 = ephemeralKey.publicKeyBase64
-            let publicKeyData = ephemeralKey.publicKey.rawRepresentation
-            logger.info("Public key length: \(publicKeyData.count) bytes")
-            logger.info("Public key base64: \(publicKeyBase64)")
+            // Step 3: Generate randomness (same as SDK's generateRandomness())
+            let randomness = generateRandomness()
+            logger.info("Generated randomness: \(randomness)")
             
-            // Step 3: Get proof from Enoki service
+            // Step 4: Generate nonce using the same format as SDK
+            let publicKeyBase64 = ephemeralKey.publicKeyBase64
+            let nonce = generateNonce(
+                publicKey: publicKeyBase64,
+                maxEpoch: maxEpoch,
+                randomness: randomness
+            )
+            logger.info("Generated nonce: \(nonce)")
+            
+            // Step 5: Get salt from salt service
+            guard let saltURL = URL(string: "\(Constants.proverBaseURL)/salt") else {
+                throw NetworkError.invalidURL
+            }
+            
+            var saltRequest = URLRequest(url: saltURL)
+            saltRequest.httpMethod = "POST"
+            saltRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            
+            let saltRequestBody: [String: Any] = ["token": token]
+            saltRequest.httpBody = try JSONSerialization.data(withJSONObject: saltRequestBody)
+            
+            let (saltData, _) = try await session.data(for: saltRequest)
+            guard let saltResponse = try JSONSerialization.jsonObject(with: saltData) as? [String: Any],
+                  let userSalt = saltResponse["salt"] as? String else {
+                throw NetworkError.invalidResponse
+            }
+            
+            logger.info("Received user salt: \(userSalt)")
+            
+            // Step 6: Get proof from prover service
             guard let proofURL = URL(string: "\(Constants.proverBaseURL)/v1/zklogin/prove") else {
                 logger.error("Invalid proof URL: \(Constants.zkLoginAPIEndpoint)")
                 throw NetworkError.invalidURL
@@ -79,20 +176,17 @@ class NetworkManager {
             proofRequest.setValue(Constants.enokiPublicKey, forHTTPHeaderField: "X-API-Key")
             proofRequest.timeoutInterval = Constants.proofTimeout
             
-            // Generate randomness (without 0x prefix)
-            var randomBytes = [UInt8](repeating: 0, count: 32)
-            _ = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
-            let jwtRandomness = randomBytes.map { String(format: "%02x", $0) }.joined()
-            
             let proofRequestBody: [String: Any] = [
                 "network": "testnet",
+                "epoch": currentEpoch,
                 "maxEpoch": maxEpoch,
                 "keyPair": [
                     "publicKey": publicKeyBase64
                 ],
                 "jwt": token,
-                "jwtRandomness": jwtRandomness,
-                "userSalt": "1" // Default salt for testing
+                "jwtRandomness": randomness,
+                "userSalt": userSalt,
+                "nonce": nonce
             ]
             
             proofRequest.httpBody = try JSONSerialization.data(withJSONObject: proofRequestBody)
@@ -107,12 +201,12 @@ class NetworkManager {
             let (proofData, proofResponse) = try await session.data(for: proofRequest)
             
             guard let proofHttpResponse = proofResponse as? HTTPURLResponse else {
-                logger.error("Invalid response type from Enoki")
+                logger.error("Invalid response type from prover service")
                 throw NetworkError.invalidResponse
             }
             
             if proofHttpResponse.statusCode != 200 {
-                logger.error("Enoki request failed with status code: \(proofHttpResponse.statusCode)")
+                logger.error("Proof request failed with status code: \(proofHttpResponse.statusCode)")
                 logger.error("Response headers: \(proofHttpResponse.allHeaderFields)")
                 if let responseString = String(data: proofData, encoding: .utf8) {
                     logger.error("Error response: \(responseString)")
@@ -120,7 +214,7 @@ class NetworkManager {
                 throw NetworkError.serverError(statusCode: proofHttpResponse.statusCode)
             }
             
-            logger.info("Successfully received proof from Enoki")
+            logger.info("Successfully received proof from prover service")
             return proofData
             
         } catch {
