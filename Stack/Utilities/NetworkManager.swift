@@ -123,9 +123,12 @@ class NetworkManager {
             }
             
             let publicKeyBase64 = ephemeralKey.publicKeyBase64
+            
             logger.info("""
             -------- Ephemeral Key Details --------
+            Raw Public Key: \(ephemeralKey.publicKey.rawRepresentation.map { String(format: "%02x", $0) }.joined())
             Generated Public Key (Base64): \(publicKeyBase64)
+            Is Valid Base64: \(Data(base64Encoded: publicKeyBase64) != nil)
             Public Key Length: \(publicKeyBase64.count)
             --------------------------------
             """)
