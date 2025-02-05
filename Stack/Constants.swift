@@ -13,10 +13,10 @@ enum Constants {
     static let rpcEndpoint = apiBaseURL  // Base URL for RPC calls
     
     // Enoki service endpoints
-    static let proverBaseURL = "https://api.enoki.mystenlabs.com"
-    static let zkLoginAPIEndpoint = "\(proverBaseURL)/api/proof"  // ZK proof endpoint
-    static let nonceEndpoint = "\(proverBaseURL)/api/validate"  // Nonce validation endpoint
-    static let saltService = "\(proverBaseURL)/api/salt"  // Salt endpoint
+    static let proverBaseURL = "https://prover.mystenlabs.com"
+    static let zkLoginAPIEndpoint = "\(proverBaseURL)/v1/zklogin/prove"  // ZK proof endpoint
+    static let nonceEndpoint = "\(proverBaseURL)/v1/nonce"  // Nonce validation endpoint
+    static let saltService = "\(proverBaseURL)/v1/salt"  // Salt endpoint
     static let networkTimeout: TimeInterval = 30
     
     // Ephemeral key configuration

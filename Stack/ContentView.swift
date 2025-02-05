@@ -19,8 +19,41 @@ struct ContentView: View {
     @State private var showingError = false
     @State private var errorMessage: String?
     @State private var accessToken: String?
+    @State private var currentStep: OnboardingStep = .welcome
+    
+    enum OnboardingStep {
+        case welcome
+        case riskQuestionnaire
+        case portfolioMatch
+        case mainApp
+    }
     
     var body: some View {
+        Group {
+            switch currentStep {
+            case .welcome:
+                welcomeView
+            case .riskQuestionnaire:
+                RiskQuestionnaireView(currentStep: $currentStep)
+            case .portfolioMatch:
+                PortfolioMatchView(currentStep: $currentStep)
+            case .mainApp:
+                MainTabView()
+            }
+        }
+        .alert("Error", isPresented: $showingError) {
+            Button("OK", role: .cancel) {
+                errorMessage = nil
+                showingError = false
+            }
+        } message: {
+            if let message = errorMessage {
+                Text(message)
+            }
+        }
+    }
+    
+    private var welcomeView: some View {
         VStack(spacing: 20) {
             if !isLoggedIn {
                 Text("Welcome to Stack")
@@ -59,6 +92,14 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 24)
                 .buttonStyle(GoogleButtonStyle())
+                
+                // Test button for skipping login
+                Button("Skip Login (Test)") {
+                    isLoggedIn = true
+                    currentStep = .riskQuestionnaire
+                }
+                .padding()
+                .buttonStyle(.bordered)
             } else {
                 Text("Welcome Back!")
                     .font(.system(size: 34, weight: .bold))
@@ -79,16 +120,6 @@ struct ContentView: View {
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
-        .alert("Error", isPresented: $showingError) {
-            Button("OK", role: .cancel) {
-                errorMessage = nil
-                showingError = false
-            }
-        } message: {
-            if let message = errorMessage {
-                Text(message)
-            }
-        }
     }
     
     private func startGoogleSignIn() {
@@ -123,6 +154,7 @@ struct ContentView: View {
                 try KeychainManager.shared.saveToken(token)
                 accessToken = token
                 isLoggedIn = true
+                currentStep = .riskQuestionnaire
             } catch {
                 showError(error.localizedDescription)
             }

@@ -68,7 +68,7 @@ class NetworkManager {
             logger.info("Public key base64: \(publicKeyBase64)")
             
             // Step 3: Get proof from Enoki service
-            guard let proofURL = URL(string: Constants.zkLoginAPIEndpoint) else {
+            guard let proofURL = URL(string: "\(Constants.proverBaseURL)/v1/zklogin/prove") else {
                 logger.error("Invalid proof URL: \(Constants.zkLoginAPIEndpoint)")
                 throw NetworkError.invalidURL
             }
@@ -85,11 +85,14 @@ class NetworkManager {
             let jwtRandomness = randomBytes.map { String(format: "%02x", $0) }.joined()
             
             let proofRequestBody: [String: Any] = [
-                "chainId": "sui-testnet",
+                "network": "testnet",
                 "maxEpoch": maxEpoch,
-                "ephemeralPublicKey": publicKeyBase64,
+                "keyPair": [
+                    "publicKey": publicKeyBase64
+                ],
+                "jwt": token,
                 "jwtRandomness": jwtRandomness,
-                "jwt": token
+                "userSalt": "1" // Default salt for testing
             ]
             
             proofRequest.httpBody = try JSONSerialization.data(withJSONObject: proofRequestBody)

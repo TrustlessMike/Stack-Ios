@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		582BE66E2D4E9BA800DCD311 /* SwiftUIX in Frameworks */ = {isa = PBXBuildFile; productRef = 582BE66D2D4E9BA800DCD311 /* SwiftUIX */; };
+		582BE67A2D4E9E2E00DCD311 /* Shimmer in Frameworks */ = {isa = PBXBuildFile; productRef = 582BE6792D4E9E2E00DCD311 /* Shimmer */; };
+		582BE67D2D4E9E7200DCD311 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 582BE67C2D4E9E7200DCD311 /* Kingfisher */; };
 		58E690452D49B46400A2642B /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 58E690442D49B46400A2642B /* GoogleSignIn */; };
 		58E690472D49B46400A2642B /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 58E690462D49B46400A2642B /* GoogleSignInSwift */; };
 /* End PBXBuildFile section */
@@ -41,6 +44,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				582BE67A2D4E9E2E00DCD311 /* Shimmer in Frameworks */,
+				582BE67D2D4E9E7200DCD311 /* Kingfisher in Frameworks */,
+				582BE66E2D4E9BA800DCD311 /* SwiftUIX in Frameworks */,
 				58E690452D49B46400A2642B /* GoogleSignIn in Frameworks */,
 				58E690472D49B46400A2642B /* GoogleSignInSwift in Frameworks */,
 			);
@@ -87,6 +93,9 @@
 			packageProductDependencies = (
 				58E690442D49B46400A2642B /* GoogleSignIn */,
 				58E690462D49B46400A2642B /* GoogleSignInSwift */,
+				582BE66D2D4E9BA800DCD311 /* SwiftUIX */,
+				582BE6792D4E9E2E00DCD311 /* Shimmer */,
+				582BE67C2D4E9E7200DCD311 /* Kingfisher */,
 			);
 			productName = Stack;
 			productReference = 58959B6C2D49A148009D8592 /* Stack.app */;
@@ -118,6 +127,9 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				58E690432D49B46400A2642B /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				582BE66C2D4E9BA800DCD311 /* XCRemoteSwiftPackageReference "SwiftUIX" */,
+				582BE6782D4E9E2E00DCD311 /* XCRemoteSwiftPackageReference "SwiftUI-Shimmer" */,
+				582BE67B2D4E9E7200DCD311 /* XCRemoteSwiftPackageReference "Kingfisher" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 58959B6D2D49A148009D8592 /* Products */;
@@ -364,6 +376,30 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		582BE66C2D4E9BA800DCD311 /* XCRemoteSwiftPackageReference "SwiftUIX" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SwiftUIX/SwiftUIX.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.2.3;
+			};
+		};
+		582BE6782D4E9E2E00DCD311 /* XCRemoteSwiftPackageReference "SwiftUI-Shimmer" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/markiv/SwiftUI-Shimmer.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.1;
+			};
+		};
+		582BE67B2D4E9E7200DCD311 /* XCRemoteSwiftPackageReference "Kingfisher" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/onevcat/Kingfisher.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.1.4;
+			};
+		};
 		58E690432D49B46400A2642B /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git";
@@ -375,6 +411,21 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		582BE66D2D4E9BA800DCD311 /* SwiftUIX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 582BE66C2D4E9BA800DCD311 /* XCRemoteSwiftPackageReference "SwiftUIX" */;
+			productName = SwiftUIX;
+		};
+		582BE6792D4E9E2E00DCD311 /* Shimmer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 582BE6782D4E9E2E00DCD311 /* XCRemoteSwiftPackageReference "SwiftUI-Shimmer" */;
+			productName = Shimmer;
+		};
+		582BE67C2D4E9E7200DCD311 /* Kingfisher */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 582BE67B2D4E9E7200DCD311 /* XCRemoteSwiftPackageReference "Kingfisher" */;
+			productName = Kingfisher;
+		};
 		58E690442D49B46400A2642B /* GoogleSignIn */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 58E690432D49B46400A2642B /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
