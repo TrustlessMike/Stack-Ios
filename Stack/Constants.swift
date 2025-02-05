@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import os
 
 enum Constants {
     static let googleOAuthConfig = GoogleOAuthConfig(
@@ -13,8 +14,8 @@ enum Constants {
     static let rpcEndpoint = apiBaseURL  // Base URL for RPC calls
     
     // Enoki service endpoints
-    static let proverBaseURL = "https://prover.mystenlabs.com"
-    static let zkLoginAPIEndpoint = "\(proverBaseURL)/v1/zklogin/prove"  // ZK proof endpoint
+    static let proverBaseURL = "https://api.enoki.mystenlabs.com"
+    static let zkLoginAPIEndpoint = "\(proverBaseURL)/v1/zklogin/nonce"
     static let nonceEndpoint = "\(proverBaseURL)/v1/nonce"  // Nonce validation endpoint
     static let saltService = "\(proverBaseURL)/v1/salt"  // Salt endpoint
     static let networkTimeout: TimeInterval = 30
@@ -65,6 +66,7 @@ struct EphemeralKey {
     let privateKey: Curve25519.Signing.PrivateKey
     let publicKey: Curve25519.Signing.PublicKey
     let validUntilEpoch: Int
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Stack", category: "EphemeralKey")
     
     init(validUntilEpoch: Int) {
         // Create a new Ed25519 key pair
@@ -75,8 +77,21 @@ struct EphemeralKey {
     
     // Get the Ed25519 public key as base64 string
     var publicKeyBase64: String {
-        // Convert to raw bytes and encode as base64
+        // Get raw representation
         let rawBytes = publicKey.rawRepresentation
-        return rawBytes.base64EncodedString()
+        
+        // Ensure we're using the correct format for Ed25519
+        // Ed25519 public keys are 32 bytes
+        guard rawBytes.count == 32 else {
+            logger.error("Invalid Ed25519 public key length: \(rawBytes.count)")
+            fatalError("Invalid Ed25519 public key length")
+        }
+        
+        // Convert to base64 without padding
+        let base64String = rawBytes.base64EncodedString()
+            .replacingOccurrences(of: "=", with: "")
+        
+        logger.info("Generated Ed25519 public key: \(base64String)")
+        return base64String
     }
 } 

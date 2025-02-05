@@ -20,7 +20,7 @@ class NetworkManager {
         session = URLSession(configuration: config)
         setupNetworkMonitoring()
     }
-    
+        
     private func setupNetworkMonitoring() {
         monitor.pathUpdateHandler = { [weak self] path in
             self?.isConnected = path.status == .satisfied
@@ -44,8 +44,8 @@ class NetworkManager {
         }
     }
     
-    private func getNonce(address: String) async throws -> String {
-        guard let nonceURL = URL(string: "\(Constants.proverBaseURL)/nonce") else {
+    private func getNonce(ephemeralPublicKey: String) async throws -> (nonce: String, randomness: String, epoch: Int, maxEpoch: Int) {
+        guard let nonceURL = URL(string: "\(Constants.proverBaseURL)/v1/zklogin/nonce") else {
             logger.error("Invalid nonce URL")
             throw NetworkError.invalidURL
         }
@@ -53,14 +53,27 @@ class NetworkManager {
         var nonceRequest = URLRequest(url: nonceURL)
         nonceRequest.httpMethod = "POST"
         nonceRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        nonceRequest.setValue("Bearer \(Constants.enokiPublicKey)", forHTTPHeaderField: "Authorization")
         
         let nonceRequestBody: [String: Any] = [
-            "address": address
+            "network": "testnet",
+            "ephemeralPublicKey": ephemeralPublicKey,
+            "additionalEpochs": Constants.maxEpochDuration
         ]
         
         nonceRequest.httpBody = try JSONSerialization.data(withJSONObject: nonceRequestBody)
         
-        logger.info("Requesting nonce for address: \(address)")
+        logger.info("""
+        -------- Nonce Request Details --------
+        URL: \(nonceURL.absoluteString)
+        Method: \(nonceRequest.httpMethod ?? "")
+        Headers: \(nonceRequest.allHTTPHeaderFields ?? [:])
+        Raw Request Body: \(String(data: nonceRequest.httpBody!, encoding: .utf8) ?? "")
+        Ephemeral Public Key Length: \(ephemeralPublicKey.count)
+        Ephemeral Public Key: \(ephemeralPublicKey)
+        --------------------------------
+        """)
+        
         let (nonceData, nonceResponse) = try await session.data(for: nonceRequest)
         
         guard let httpResponse = nonceResponse as? HTTPURLResponse else {
@@ -73,120 +86,91 @@ class NetworkManager {
             if let responseString = String(data: nonceData, encoding: .utf8) {
                 logger.error("Error response: \(responseString)")
             }
+            logger.error("Request headers: \(nonceRequest.allHTTPHeaderFields ?? [:])")
             throw NetworkError.serverError(statusCode: httpResponse.statusCode)
         }
         
         guard let json = try JSONSerialization.jsonObject(with: nonceData) as? [String: Any],
-              let nonce = json["nonce"] as? String else {
+              let data = json["data"] as? [String: Any],
+              let nonce = data["nonce"] as? String,
+              let randomness = data["randomness"] as? String,
+              let epoch = data["epoch"] as? Int,
+              let maxEpoch = data["maxEpoch"] as? Int else {
             logger.error("Invalid nonce response format")
             throw NetworkError.invalidResponse
         }
         
-        logger.info("Successfully received nonce: \(nonce)")
-        return nonce
-    }
-    
-    private func generateNonce(publicKey: String, maxEpoch: Int, randomness: String) -> String {
-        // Combine inputs in the same order as @mysten/zklogin SDK
-        let input = "\(publicKey)\(maxEpoch)\(randomness)"
-        
-        // Hash the combined input using SHA-256 (same as SDK)
-        let inputData = input.data(using: .utf8)!
-        let hashedData = SHA256.hash(data: inputData)
-        
-        // Convert hash to hex string without 0x prefix
-        let nonce = hashedData.map { String(format: "%02x", $0) }.joined()
-        
         logger.info("""
-        Generated nonce with components:
-        Public Key: \(publicKey)
-        Max Epoch: \(maxEpoch)
+        Successfully received nonce response:
+        Nonce: \(nonce)
         Randomness: \(randomness)
-        Generated Nonce: \(nonce)
+        Epoch: \(epoch)
+        Max Epoch: \(maxEpoch)
         """)
         
-        return nonce
-    }
-    
-    private func generateRandomness() -> String {
-        var randomBytes = [UInt8](repeating: 0, count: 32)
-        _ = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
-        return randomBytes.map { String(format: "%02x", $0) }.joined()
+        return (nonce, randomness, epoch, maxEpoch)
     }
     
     func sendZkLoginProofRequest(token: String) async throws -> Data {
         do {
             try await waitForConnection()
             
-            // Step 1: Get current epoch and calculate maxEpoch
-            logger.info("Fetching current epoch...")
-            let currentEpoch = try await getCurrentEpoch()
-            let maxEpoch = currentEpoch + Constants.maxEpochDuration // e.g., +10 epochs
-            logger.info("Current epoch: \(currentEpoch), maxEpoch: \(maxEpoch)")
-            
-            // Step 2: Generate ephemeral key pair
-            currentEphemeralKey = EphemeralKey(validUntilEpoch: maxEpoch)
+            logger.info("Starting ephemeral key generation...")
+            currentEphemeralKey = EphemeralKey(validUntilEpoch: 0)
             guard let ephemeralKey = currentEphemeralKey else {
                 logger.error("Failed to generate ephemeral key")
                 throw NetworkError.keyGenerationFailed
             }
             
-            // Step 3: Generate randomness (same as SDK's generateRandomness())
-            let randomness = generateRandomness()
-            logger.info("Generated randomness: \(randomness)")
-            
-            // Step 4: Generate nonce using the same format as SDK
             let publicKeyBase64 = ephemeralKey.publicKeyBase64
-            let nonce = generateNonce(
-                publicKey: publicKeyBase64,
-                maxEpoch: maxEpoch,
-                randomness: randomness
-            )
-            logger.info("Generated nonce: \(nonce)")
+            logger.info("""
+            -------- Ephemeral Key Details --------
+            Generated Public Key (Base64): \(publicKeyBase64)
+            Public Key Length: \(publicKeyBase64.count)
+            --------------------------------
+            """)
             
-            // Step 5: Get salt from salt service
-            guard let saltURL = URL(string: "\(Constants.proverBaseURL)/salt") else {
+            let (nonce, randomness, currentEpoch, maxEpoch) = try await getNonce(ephemeralPublicKey: publicKeyBase64)
+            logger.info("Using Enoki-provided values - Nonce: \(nonce), Randomness: \(randomness)")
+            
+            currentEphemeralKey = EphemeralKey(validUntilEpoch: maxEpoch)
+            
+            guard let saltURL = URL(string: "\(Constants.proverBaseURL)/v1/zklogin") else {
                 throw NetworkError.invalidURL
             }
             
             var saltRequest = URLRequest(url: saltURL)
-            saltRequest.httpMethod = "POST"
+            saltRequest.httpMethod = "GET"
             saltRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            
-            let saltRequestBody: [String: Any] = ["token": token]
-            saltRequest.httpBody = try JSONSerialization.data(withJSONObject: saltRequestBody)
+            saltRequest.setValue("Bearer \(Constants.enokiPublicKey)", forHTTPHeaderField: "Authorization")
+            saltRequest.setValue(token, forHTTPHeaderField: "zklogin-jwt")
             
             let (saltData, _) = try await session.data(for: saltRequest)
             guard let saltResponse = try JSONSerialization.jsonObject(with: saltData) as? [String: Any],
-                  let userSalt = saltResponse["salt"] as? String else {
+                  let data = saltResponse["data"] as? [String: Any],
+                  let userSalt = data["salt"] as? String else {
                 throw NetworkError.invalidResponse
             }
             
             logger.info("Received user salt: \(userSalt)")
             
-            // Step 6: Get proof from prover service
-            guard let proofURL = URL(string: "\(Constants.proverBaseURL)/v1/zklogin/prove") else {
-                logger.error("Invalid proof URL: \(Constants.zkLoginAPIEndpoint)")
+            guard let proofURL = URL(string: "\(Constants.proverBaseURL)/v1/zklogin/zkp") else {
+                logger.error("Invalid proof URL")
                 throw NetworkError.invalidURL
             }
             
             var proofRequest = URLRequest(url: proofURL)
             proofRequest.httpMethod = "POST"
             proofRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            proofRequest.setValue(Constants.enokiPublicKey, forHTTPHeaderField: "X-API-Key")
+            proofRequest.setValue("Bearer \(Constants.enokiPublicKey)", forHTTPHeaderField: "Authorization")
+            proofRequest.setValue(token, forHTTPHeaderField: "zklogin-jwt")
             proofRequest.timeoutInterval = Constants.proofTimeout
             
             let proofRequestBody: [String: Any] = [
                 "network": "testnet",
-                "epoch": currentEpoch,
+                "ephemeralPublicKey": publicKeyBase64,
                 "maxEpoch": maxEpoch,
-                "keyPair": [
-                    "publicKey": publicKeyBase64
-                ],
-                "jwt": token,
-                "jwtRandomness": randomness,
-                "userSalt": userSalt,
-                "nonce": nonce
+                "randomness": randomness
             ]
             
             proofRequest.httpBody = try JSONSerialization.data(withJSONObject: proofRequestBody)
@@ -227,7 +211,7 @@ class NetworkManager {
         }
     }
     
-    private func getCurrentEpoch() async throws -> Int {
+    private func getCurrentEpoch() async throws -> (epoch: Int, rawJson: String) {
         guard let systemStateURL = URL(string: Constants.apiBaseURL) else {
             logger.error("Invalid RPC URL: \(Constants.apiBaseURL)")
             throw NetworkError.invalidURL
@@ -268,10 +252,12 @@ class NetworkManager {
         }
         
         do {
-            // Log the raw response for debugging
-            if let responseString = String(data: systemStateData, encoding: .utf8) {
-                logger.info("Raw RPC response: \(responseString)")
+            guard let rawJsonString = String(data: systemStateData, encoding: .utf8) else {
+                logger.error("Failed to convert response data to string")
+                throw NetworkError.invalidResponse
             }
+            
+            logger.info("Raw RPC response: \(rawJsonString)")
             
             let json = try JSONSerialization.jsonObject(with: systemStateData) as? [String: Any]
             guard let result = json?["result"] as? [String: Any] else {
@@ -279,24 +265,19 @@ class NetworkManager {
                 throw NetworkError.invalidResponse
             }
             
-            // Try different paths to find epoch
             var epoch: Int?
             
-            // Try direct epoch field
             if let directEpoch = result["epoch"] as? Int {
                 epoch = directEpoch
             }
-            // Try epoch as string
             else if let epochStr = result["epoch"] as? String, 
                     let epochInt = Int(epochStr) {
                 epoch = epochInt
             }
-            // Try system state path
             else if let systemState = result["systemState"] as? [String: Any],
                     let epochNum = systemState["epoch"] as? Int {
                 epoch = epochNum
             }
-            // Try data path
             else if let data = result["data"] as? [String: Any],
                     let epochNum = data["epoch"] as? Int {
                 epoch = epochNum
@@ -308,7 +289,7 @@ class NetworkManager {
             }
             
             logger.info("Successfully parsed epoch: \(validEpoch)")
-            return validEpoch
+            return (epoch: validEpoch, rawJson: rawJsonString)
             
         } catch {
             logger.error("Failed to parse RPC response: \(error.localizedDescription)")
@@ -331,13 +312,13 @@ enum NetworkError: Error {
     
     var localizedDescription: String {
         switch self {
-        case .invalidURL:
+            case .invalidURL:
             return "Invalid URL configuration"
-        case .invalidResponse:
+            case .invalidResponse:
             return "Invalid response from server"
         case .serverError(let code):
             return "Server error: \(code)"
-        case .noConnection:
+            case .noConnection:
             return "No network connection"
         case .keyGenerationFailed:
             return "Failed to generate ephemeral key"
