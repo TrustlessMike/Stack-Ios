@@ -128,42 +128,93 @@ struct ContentView: View {
             return
         }
         
-        let config = GIDConfiguration(clientID: Constants.googleOAuthConfig.clientId)
-        GIDSignIn.sharedInstance.configuration = config
-        
-        GIDSignIn.sharedInstance.signIn(withPresenting: presentingViewController) { result, error in
-            if let error = error {
-                showError(error.localizedDescription)
-                return
-            }
-            
-            guard let result = result,
-                  let idToken = result.user.idToken?.tokenString else {
-                showError("Failed to get ID token")
-                return
-            }
-            
-            handleSuccessfulLogin(with: idToken)
-        }
-    }
-    
-    private func handleSuccessfulLogin(with token: String) {
         Task {
             do {
-                try await sendProofRequest(token: token)
-                try KeychainManager.shared.saveToken(token)
-                accessToken = token
+                // Step 1: Create ephemeral key and get nonce from Enoki FIRST
+                let ephemeralKey = try EphemeralKey(validUntilEpoch: 0)
+                let (nonceFromEnoki, randomness, _, maxEpoch) = try await NetworkManager.shared.getNonce(ephemeralPublicKey: ephemeralKey.publicKeyBase64)
+                
+                // Step 2: Create the Google Sign-In URL with the correct nonce
+                var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")
+                components?.queryItems = [
+                    URLQueryItem(name: "client_id", value: Constants.googleOAuthConfig.clientId),
+                    URLQueryItem(name: "redirect_uri", value: Constants.googleOAuthConfig.redirectUri),
+                    URLQueryItem(name: "response_type", value: "id_token"),
+                    URLQueryItem(name: "scope", value: "email profile openid"),
+                    URLQueryItem(name: "nonce", value: nonceFromEnoki),  // Include Enoki's nonce
+                    URLQueryItem(name: "prompt", value: "select_account")
+                ]
+                
+                guard let authURL = components?.url else {
+                    showError("Failed to create auth URL")
+                    return
+                }
+                
+                // Step 3: Start the auth session
+                let scheme = Constants.googleOAuthConfig.redirectUri.components(separatedBy: ":/").first ?? ""
+                
+                let idToken: String = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+                    let session = ASWebAuthenticationSession(
+                        url: authURL,
+                        callbackURLScheme: scheme
+                    ) { callbackURL, error in
+                        if let error = error {
+                            continuation.resume(throwing: error)
+                            return
+                        }
+                        
+                        guard let callbackURL = callbackURL,
+                              let fragment = callbackURL.fragment else {
+                            continuation.resume(throwing: NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid callback URL"]))
+                            return
+                        }
+                        
+                        // Parse the fragment to get the ID token
+                        let params = fragment
+                            .components(separatedBy: "&")
+                            .map { $0.components(separatedBy: "=") }
+                            .reduce(into: [String: String]()) { result, param in
+                                if param.count == 2 {
+                                    result[param[0]] = param[1].removingPercentEncoding
+                                }
+                            }
+                        
+                        if let idToken = params["id_token"] {
+                            continuation.resume(returning: idToken)
+                        } else {
+                            continuation.resume(throwing: NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "No ID token in response"]))
+                        }
+                    }
+                    
+                    session.presentationContextProvider = AuthContext.shared
+                    session.prefersEphemeralWebBrowserSession = true
+                    
+                    if !session.start() {
+                        continuation.resume(throwing: NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to start auth session"]))
+                    }
+                }
+                
+                // Step 4: Send proof request with the JWT that contains the correct nonce
+                let data = try await NetworkManager.shared.sendZkLoginProofRequest(
+                    token: idToken,
+                    nonce: nonceFromEnoki,
+                    randomness: randomness,
+                    maxEpoch: maxEpoch,
+                    publicKey: ephemeralKey.publicKeyBase64
+                )
+                
+                // Handle successful proof
+                try KeychainManager.shared.saveToken(idToken)
+                accessToken = idToken
                 isLoggedIn = true
                 currentStep = .riskQuestionnaire
+                
+                print("Received proof response:", String(data: data, encoding: .utf8) ?? "")
+                
             } catch {
                 showError(error.localizedDescription)
             }
         }
-    }
-    
-    private func sendProofRequest(token: String) async throws {
-        let data = try await NetworkManager.shared.sendZkLoginProofRequest(token: token)
-        print("Received proof response:", String(data: data, encoding: .utf8) ?? "")
     }
     
     private func logout() {

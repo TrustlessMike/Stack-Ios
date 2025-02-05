@@ -44,8 +44,8 @@ class NetworkManager {
         }
     }
     
-    private func getNonce(ephemeralPublicKey: String) async throws -> (nonce: String, randomness: String, epoch: Int, maxEpoch: Int) {
-        guard let nonceURL = URL(string: "\(Constants.proverBaseURL)/v1/zklogin/nonce") else {
+    func getNonce(ephemeralPublicKey: String) async throws -> (nonce: String, randomness: String, epoch: Int, maxEpoch: Int) {
+        guard let nonceURL = URL(string: "\(Constants.zkLoginEndpoint)/nonce") else {
             logger.error("Invalid nonce URL")
             throw NetworkError.invalidURL
         }
@@ -56,7 +56,7 @@ class NetworkManager {
         nonceRequest.setValue("Bearer \(Constants.enokiPublicKey)", forHTTPHeaderField: "Authorization")
         
         let nonceRequestBody: [String: Any] = [
-            "network": "testnet",
+            "network": Constants.network,
             "ephemeralPublicKey": ephemeralPublicKey,
             "additionalEpochs": Constants.maxEpochDuration
         ]
@@ -64,14 +64,11 @@ class NetworkManager {
         nonceRequest.httpBody = try JSONSerialization.data(withJSONObject: nonceRequestBody)
         
         logger.info("""
-        -------- Nonce Request Details --------
+        Sending nonce request:
         URL: \(nonceURL.absoluteString)
-        Method: \(nonceRequest.httpMethod ?? "")
-        Headers: \(nonceRequest.allHTTPHeaderFields ?? [:])
-        Raw Request Body: \(String(data: nonceRequest.httpBody!, encoding: .utf8) ?? "")
-        Ephemeral Public Key Length: \(ephemeralPublicKey.count)
-        Ephemeral Public Key: \(ephemeralPublicKey)
-        --------------------------------
+        Public Key: \(ephemeralPublicKey)
+        Network: \(Constants.network)
+        Additional Epochs: \(Constants.maxEpochDuration)
         """)
         
         let (nonceData, nonceResponse) = try await session.data(for: nonceRequest)
@@ -86,7 +83,6 @@ class NetworkManager {
             if let responseString = String(data: nonceData, encoding: .utf8) {
                 logger.error("Error response: \(responseString)")
             }
-            logger.error("Request headers: \(nonceRequest.allHTTPHeaderFields ?? [:])")
             throw NetworkError.serverError(statusCode: httpResponse.statusCode)
         }
         
@@ -100,45 +96,43 @@ class NetworkManager {
             throw NetworkError.invalidResponse
         }
         
-        logger.info("""
-        Successfully received nonce response:
-        Nonce: \(nonce)
-        Randomness: \(randomness)
-        Epoch: \(epoch)
-        Max Epoch: \(maxEpoch)
-        """)
-        
+        logger.info("Successfully received nonce response")
         return (nonce, randomness, epoch, maxEpoch)
     }
     
-    func sendZkLoginProofRequest(token: String) async throws -> Data {
+    func sendZkLoginProofRequest(
+        token: String,
+        nonce: String,
+        randomness: String,
+        maxEpoch: Int,
+        publicKey: String
+    ) async throws -> Data {
         do {
             try await waitForConnection()
             
-            logger.info("Starting ephemeral key generation...")
-            currentEphemeralKey = EphemeralKey(validUntilEpoch: 0)
-            guard let ephemeralKey = currentEphemeralKey else {
-                logger.error("Failed to generate ephemeral key")
-                throw NetworkError.keyGenerationFailed
-            }
-            
-            let publicKeyBase64 = ephemeralKey.publicKeyBase64
-            
+            // Log JWT token details
             logger.info("""
-            -------- Ephemeral Key Details --------
-            Raw Public Key: \(ephemeralKey.publicKey.rawRepresentation.map { String(format: "%02x", $0) }.joined())
-            Generated Public Key (Base64): \(publicKeyBase64)
-            Is Valid Base64: \(Data(base64Encoded: publicKeyBase64) != nil)
-            Public Key Length: \(publicKeyBase64.count)
+            -------- JWT Token Details --------
+            Token Length: \(token.count)
+            Expected Nonce: \(nonce)
             --------------------------------
             """)
             
-            let (nonce, randomness, currentEpoch, maxEpoch) = try await getNonce(ephemeralPublicKey: publicKeyBase64)
-            logger.info("Using Enoki-provided values - Nonce: \(nonce), Randomness: \(randomness)")
+            // Decode JWT parts for debugging
+            let jwtParts = token.components(separatedBy: ".")
+            if jwtParts.count == 3 {
+                jwtParts.enumerated().forEach { index, part in
+                    if let data = Data(base64Encoded: part.padding(toLength: ((part.count + 3) / 4) * 4, 
+                                                                 withPad: "=", 
+                                                                 startingAt: 0)),
+                       let decodedString = String(data: data, encoding: .utf8) {
+                        logger.info("JWT Part \(index): \(decodedString)")
+                    }
+                }
+            }
             
-            currentEphemeralKey = EphemeralKey(validUntilEpoch: maxEpoch)
-            
-            guard let saltURL = URL(string: "\(Constants.proverBaseURL)/v1/zklogin") else {
+            // Get salt using the nonce
+            guard let saltURL = URL(string: Constants.zkLoginEndpoint) else {
                 throw NetworkError.invalidURL
             }
             
@@ -147,17 +141,33 @@ class NetworkManager {
             saltRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
             saltRequest.setValue("Bearer \(Constants.enokiPublicKey)", forHTTPHeaderField: "Authorization")
             saltRequest.setValue(token, forHTTPHeaderField: "zklogin-jwt")
+            saltRequest.setValue(nonce, forHTTPHeaderField: "zklogin-nonce")
             
-            let (saltData, _) = try await session.data(for: saltRequest)
-            guard let saltResponse = try JSONSerialization.jsonObject(with: saltData) as? [String: Any],
-                  let data = saltResponse["data"] as? [String: Any],
-                  let userSalt = data["salt"] as? String else {
+            let (saltData, saltResponse) = try await session.data(for: saltRequest)
+            
+            guard let httpSaltResponse = saltResponse as? HTTPURLResponse else {
+                logger.error("Invalid response type from salt endpoint")
                 throw NetworkError.invalidResponse
             }
             
-            logger.info("Received user salt: \(userSalt)")
+            if httpSaltResponse.statusCode != 200 {
+                logger.error("Salt request failed with status code: \(httpSaltResponse.statusCode)")
+                if let responseString = String(data: saltData, encoding: .utf8) {
+                    logger.error("Error response: \(responseString)")
+                }
+                throw NetworkError.serverError(statusCode: httpSaltResponse.statusCode)
+            }
             
-            guard let proofURL = URL(string: "\(Constants.proverBaseURL)/v1/zklogin/zkp") else {
+            guard let saltResponseJson = try JSONSerialization.jsonObject(with: saltData) as? [String: Any],
+                  let saltData = saltResponseJson["data"] as? [String: Any],
+                  let userSalt = saltData["salt"] as? String else {
+                throw NetworkError.invalidResponse
+            }
+            
+            logger.info("Received salt: \(userSalt)")
+            
+            // Get proof using the nonce and salt
+            guard let proofURL = URL(string: "\(Constants.zkLoginEndpoint)/zkp") else {
                 logger.error("Invalid proof URL")
                 throw NetworkError.invalidURL
             }
@@ -167,23 +177,28 @@ class NetworkManager {
             proofRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
             proofRequest.setValue("Bearer \(Constants.enokiPublicKey)", forHTTPHeaderField: "Authorization")
             proofRequest.setValue(token, forHTTPHeaderField: "zklogin-jwt")
+            proofRequest.setValue(nonce, forHTTPHeaderField: "zklogin-nonce")
             proofRequest.timeoutInterval = Constants.proofTimeout
             
             let proofRequestBody: [String: Any] = [
-                "network": "testnet",
-                "ephemeralPublicKey": publicKeyBase64,
+                "network": Constants.network,
+                "ephemeralPublicKey": publicKey,
                 "maxEpoch": maxEpoch,
-                "randomness": randomness
+                "randomness": randomness,
+                "nonce": nonce,
+                "salt": userSalt
             ]
             
             proofRequest.httpBody = try JSONSerialization.data(withJSONObject: proofRequestBody)
             
-            logger.info("Sending proof request to: \(proofURL.absoluteString)")
-            logger.info("Using X-API-Key: \(Constants.enokiPublicKey)")
-            if let requestBody = String(data: proofRequest.httpBody!, encoding: .utf8) {
-                logger.info("Proof request body: \(requestBody)")
-            }
-            logger.info("Request headers: \(proofRequest.allHTTPHeaderFields ?? [:])")
+            logger.info("""
+            Sending proof request:
+            Nonce: \(nonce)
+            Public Key: \(publicKey)
+            Max Epoch: \(maxEpoch)
+            Salt: \(userSalt)
+            JWT Token Length: \(token.count)
+            """)
             
             let (proofData, proofResponse) = try await session.data(for: proofRequest)
             
@@ -194,7 +209,6 @@ class NetworkManager {
             
             if proofHttpResponse.statusCode != 200 {
                 logger.error("Proof request failed with status code: \(proofHttpResponse.statusCode)")
-                logger.error("Response headers: \(proofHttpResponse.allHeaderFields)")
                 if let responseString = String(data: proofData, encoding: .utf8) {
                     logger.error("Error response: \(responseString)")
                 }

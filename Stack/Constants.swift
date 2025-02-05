@@ -11,26 +11,19 @@ enum Constants {
     
     // Using the Sui testnet endpoints
     static let apiBaseURL = "https://fullnode.testnet.sui.io"
-    static let rpcEndpoint = apiBaseURL  // Base URL for RPC calls
     
     // Enoki service endpoints
     static let proverBaseURL = "https://api.enoki.mystenlabs.com"
-    static let zkLoginAPIEndpoint = "\(proverBaseURL)/v1/zklogin/nonce"
-    static let nonceEndpoint = "\(proverBaseURL)/v1/nonce"  // Nonce validation endpoint
-    static let saltService = "\(proverBaseURL)/v1/salt"  // Salt endpoint
-    static let networkTimeout: TimeInterval = 30
+    static let zkLoginEndpoint = "\(proverBaseURL)/v1/zklogin"
     
-    // Ephemeral key configuration
-    static let ephemeralKeyValidityInEpochs = 2  // Key valid for 2 epochs from current
+    // Network configuration
+    static let networkTimeout: TimeInterval = 30
+    static let proofTimeout: TimeInterval = 30
     
     // Enoki specific configurations
     static let enokiPublicKey = "enoki_public_340d1143bcdc3990013f2e8f83c7930a"
-    static let maxEpochDuration = 2  // Number of epochs the proof is valid for
-    static let proofTimeout: TimeInterval = 30  // Timeout for proof generation
-    
-    // Remove deprecated paths
-    // static let proverPath = "/v1/zklogin/prove"  // Updated proof endpoint path
-    // static let saltPath = "/v1/get_salt"  // Salt retrieval endpoint
+    static let maxEpochDuration = 2
+    static let network = "testnet"
 }
 
 struct GoogleOAuthConfig {
@@ -65,33 +58,108 @@ struct JWTPayload: Codable {
 struct EphemeralKey {
     let privateKey: Curve25519.Signing.PrivateKey
     let publicKey: Curve25519.Signing.PublicKey
-    let validUntilEpoch: Int
+    var validUntilEpoch: Int
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Stack", category: "EphemeralKey")
     
-    init(validUntilEpoch: Int) {
-        // Create a new Ed25519 key pair
-        self.privateKey = Curve25519.Signing.PrivateKey()
-        self.publicKey = privateKey.publicKey
-        self.validUntilEpoch = validUntilEpoch
+    enum KeyGenerationError: Error {
+        case randomBytesGenerationFailed
+        case invalidKeyLength
+        case privateKeyCreationFailed
+        case publicKeyValidationFailed
+        case invalidBase64Encoding
+        
+        var localizedDescription: String {
+            switch self {
+            case .randomBytesGenerationFailed:
+                return "Failed to generate secure random bytes"
+            case .invalidKeyLength:
+                return "Generated key has invalid length"
+            case .privateKeyCreationFailed:
+                return "Failed to create private key from bytes"
+            case .publicKeyValidationFailed:
+                return "Public key validation failed"
+            case .invalidBase64Encoding:
+                return "Failed to encode public key in base64"
+            }
+        }
     }
     
-    // Get the Ed25519 public key as base64 string
+    init(validUntilEpoch: Int) throws {
+        self.validUntilEpoch = validUntilEpoch
+        
+        logger.info("Starting Ed25519 key generation...")
+        
+        // Generate a new Ed25519 key pair
+        let privateKey = Curve25519.Signing.PrivateKey()
+        self.privateKey = privateKey
+        self.publicKey = privateKey.publicKey
+        
+        // Validate public key
+        let publicKeyBytes = publicKey.rawRepresentation
+        guard publicKeyBytes.count == 32 else {
+            logger.error("Invalid Ed25519 public key length: \(publicKeyBytes.count)")
+            throw KeyGenerationError.invalidKeyLength
+        }
+        
+        // Format the key as required by Sui zkLogin
+        var formattedKey = Data([0x00]) // Add prefix byte 0x00 for Ed25519
+        formattedKey.append(publicKeyBytes)
+        
+        // Validate the generated key can be properly encoded
+        let base64String = formattedKey.base64EncodedString()
+        guard Data(base64Encoded: base64String) != nil else {
+            logger.error("Failed to validate base64 encoding of public key")
+            throw KeyGenerationError.invalidBase64Encoding
+        }
+        
+        logger.info("""
+        Successfully generated Ed25519 key pair:
+        Public key length: \(publicKeyBytes.count)
+        Raw bytes (hex): \(publicKeyBytes.map { String(format: "%02x", $0) }.joined())
+        Formatted key (hex): \(formattedKey.map { String(format: "%02x", $0) }.joined())
+        Public key base64: \(base64String)
+        """)
+    }
+    
+    // Get the Ed25519 public key as standard base64 string
     var publicKeyBase64: String {
-        // Get raw representation
         let rawBytes = publicKey.rawRepresentation
         
-        // Ensure we're using the correct format for Ed25519
-        // Ed25519 public keys are 32 bytes
+        // Ed25519 public keys must be 32 bytes
         guard rawBytes.count == 32 else {
             logger.error("Invalid Ed25519 public key length: \(rawBytes.count)")
             fatalError("Invalid Ed25519 public key length")
         }
         
-        // Convert to base64 without padding
-        let base64String = rawBytes.base64EncodedString()
-            .replacingOccurrences(of: "=", with: "")
+        // Format the key as required by Sui zkLogin
+        var formattedKey = Data([0x00]) // Add prefix byte 0x00 for Ed25519
+        formattedKey.append(rawBytes)
         
-        logger.info("Generated Ed25519 public key: \(base64String)")
+        // Use standard base64 encoding with padding
+        let base64String = formattedKey.base64EncodedString()
+        
+        logger.debug("""
+        Ed25519 public key encoding:
+        Raw bytes length: \(rawBytes.count)
+        Raw bytes (hex): \(rawBytes.map { String(format: "%02x", $0) }.joined())
+        Formatted key (hex): \(formattedKey.map { String(format: "%02x", $0) }.joined())
+        Base64 string: \(base64String)
+        Base64 length: \(base64String.count)
+        Is valid base64: \(Data(base64Encoded: base64String) != nil)
+        """)
+        
         return base64String
+    }
+    
+    // Sign data with the Ed25519 private key
+    func sign(_ data: Data) throws -> Data {
+        do {
+            let signature = try privateKey.signature(for: data)
+            logger.info("Successfully signed data with Ed25519 private key")
+            return signature
+        } catch {
+            logger.error("Failed to sign data: \(error.localizedDescription)")
+            throw error
+        }
     }
 } 
