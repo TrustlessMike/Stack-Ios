@@ -12,13 +12,39 @@ enum Constants {
     // Using the Sui testnet endpoints
     static let apiBaseURL = "https://fullnode.testnet.sui.io"
     
-    // Enoki service endpoints
+    // UPDATED: zkLogin API Endpoints with multiple potential base URLs
+    // Primary prover service (original)
     static let proverBaseURL = "https://api.enoki.mystenlabs.com"
-    static let zkLoginEndpoint = "\(proverBaseURL)/v1/zklogin"
+    
+    // Alternative prover services to try if primary fails
+    static let altProverBaseURLs = [
+        "https://api.zklogin.mystenlabs.com",           // Alternative 1
+        "https://zklogin.api.mystenlabs.com",           // Alternative 2
+        "https://enoki-api.zklogin.io",                 // Alternative 3
+        "https://zkloginapi.mystenlabs.com"             // Alternative 4
+    ]
+    
+    // Endpoint paths that can be combined with base URLs
+    static let zkLoginPathV1 = "/v1/zklogin"
+    static let zkLoginPathV2 = "/v2/zklogin"            // Try v2 if v1 fails
+    static let zkLoginPathNoVersion = "/zklogin"        // Try without version if others fail
+    
+    // Default endpoints (will be adjusted dynamically if needed)
+    static let zkLoginEndpoint = "\(proverBaseURL)\(zkLoginPathV1)"
+    static let saltEndpoint = "\(zkLoginEndpoint)/salt"
+    static let proofEndpoint = "\(zkLoginEndpoint)/proof"
+    
+    // Direct function to build a zkLogin URL with a specific base and path
+    static func buildZkLoginURL(base: String, path: String, endpoint: String) -> String {
+        return "\(base)\(path)/\(endpoint)"
+    }
+    
+    // Flag to enable dynamic endpoint discovery
+    static let enableEndpointFallbacks = true
     
     // Network configuration
     static let networkTimeout: TimeInterval = 30
-    static let proofTimeout: TimeInterval = 30
+    static let proofTimeout: TimeInterval = 60  // Increased timeout for proof generation
     
     // Enoki specific configurations
     static let enokiPublicKey = "enoki_public_340d1143bcdc3990013f2e8f83c7930a"
